@@ -47,114 +47,90 @@ class SetupController
     }
     
     public function testConnection()
-{
-    // Ensure the session is started.
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
-    }
-    
-    // Only accept POST requests.
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        header("HTTP/1.1 405 Method Not Allowed");
-        exit;
-    }
-    
-    // Retrieve JSON payload from the request.
-    $json = file_get_contents("php://input");
-    $data = json_decode($json, true);
-    
-    // Extract parameters with defaults.
-    $host = trim($data['DB_HOST'] ?? '');
-    $dbName = trim($data['DB_NAME'] ?? '');
-    $user = trim($data['DB_USER'] ?? '');
-    $pass = $data['DB_PASS'] ?? '';
-    $allowEmptyPass = isset($data['allow_empty_password']) && $data['allow_empty_password'];
-    $createDbWanted = isset($data['create_db_if_missing']) && $data['create_db_if_missing'];
-    
-    // Validate basic input.
-    if (empty($pass) && !$allowEmptyPass) {
-        header('Content-Type: application/json');
-        echo json_encode(['success' => false, 'message' => 'DB_PASS cannot be blank unless allowed.']);
-        exit;
-    }
-    if (empty($dbName)) {
-        header('Content-Type: application/json');
-        echo json_encode(['success' => false, 'message' => 'DB_NAME cannot be empty.']);
-        exit;
-    }
-    
-    // Use your existing DatabaseModel to check (and optionally create) the DB.
-    $error = $this->dbModel->checkOrCreateDb($host, $dbName, $user, $pass, $createDbWanted);
-    
-    header('Content-Type: application/json');
-    if (!empty($error)) {
-        echo json_encode(['success' => false, 'message' => $error]);
-    } else {
-        echo json_encode(['success' => true]);
-    }
-    exit;
-}
-
-    public function database()
     {
-        // Ensure session is started
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
-    
-        // Handle form submission
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $host            = $_POST['DB_HOST'] ?? '';
-            $dbName          = $_POST['DB_NAME'] ?? '';
-            $user            = $_POST['DB_USER'] ?? '';
-            $pass            = $_POST['DB_PASS'] ?? '';
-            $allowEmptyPass  = isset($_POST['allow_empty_password']);
-            $createDbWanted  = isset($_POST['create_db_if_missing']);
-    
-            // Validation: check DB password
-            if (empty($pass) && !$allowEmptyPass) {
-                $_SESSION['dbPassError'] = true;
-                header("Location: /setup/database");
-                exit;
-            }
-            // Validation: DB name must not be empty
-            if (!$dbName) {
-                $_SESSION['dbErrorMessage'] = "DB_NAME cannot be empty";
-                header("Location: /setup/database");
-                exit;
-            }
-    
-            // Check (and optionally create) the database
-            $dbError = $this->dbModel->checkOrCreateDb($host, $dbName, $user, $pass, $createDbWanted);
-            if ($dbError) {
-                $_SESSION['dbErrorMessage'] = $dbError;
-                header("Location: /setup/database");
-                exit;
-            }
-    
-            // Write .env file
-            $this->envModel->updateEnv([
-                'DB_HOST' => $host,
-                'DB_NAME' => $dbName,
-                'DB_USER' => $user,
-                'DB_PASS' => $pass
-                // plus any others like APP_ENV, APP_DEBUG if needed
-            ], $allowEmptyPass);
-    
-            // On success, go to next step
-            header("Location: /setup/db_tables");
+        
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header("HTTP/1.1 405 Method Not Allowed");
             exit;
         }
-    
-        // For GET: load any existing .env values and error messages from session
-        $existing        = $this->envModel->readEnv();
-        $dbErrorMessage  = $_SESSION['dbErrorMessage'] ?? '';
-        $dbPassError     = $_SESSION['dbPassError'] ?? false;
-        unset($_SESSION['dbErrorMessage'], $_SESSION['dbPassError']);
-    
-        // Render the "database" view
-        $this->render('database', compact('existing', 'dbErrorMessage', 'dbPassError'));
+        
+        $json = file_get_contents("php://input");
+        $data = json_decode($json, true);
+        
+        $host           = trim($data['DB_HOST'] ?? '');
+        $dbName         = trim($data['DB_NAME'] ?? '');
+        $user           = trim($data['DB_USER'] ?? '');
+        $pass           = $data['DB_PASS'] ?? '';
+        $createDbWanted = isset($data['create_db_if_missing']) && $data['create_db_if_missing'];
+        
+        if (empty($dbName)) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'DB_NAME cannot be empty.']);
+            exit;
+        }
+        
+        $error = $this->dbModel->checkOrCreateDb($host, $dbName, $user, $pass, $createDbWanted);
+        
+        header('Content-Type: application/json');
+        if (!empty($error)) {
+            echo json_encode(['success' => false, 'message' => $error]);
+        } else {
+            echo json_encode(['success' => true]);
+        }
+        exit;
     }
+    
+
+public function database()
+{
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $host           = $_POST['DB_HOST'] ?? '';
+        $dbName         = $_POST['DB_NAME'] ?? '';
+        $user           = $_POST['DB_USER'] ?? '';
+        $pass           = $_POST['DB_PASS'] ?? '';
+        $createDbWanted = isset($_POST['create_db_if_missing']);
+
+        // Validate that DB_NAME is provided.
+        if (!$dbName) {
+            $_SESSION['dbErrorMessage'] = "DB_NAME cannot be empty";
+            header("Location: /setup/database");
+            exit;
+        }
+
+        // Use your DatabaseModel to check (and optionally create) the DB.
+        $dbError = $this->dbModel->checkOrCreateDb($host, $dbName, $user, $pass, $createDbWanted);
+        if ($dbError) {
+            $_SESSION['dbErrorMessage'] = $dbError;
+            header("Location: /setup/database");
+            exit;
+        }
+
+        // Update the .env file ensuring that the key DB_PASS is written, even if empty.
+        $this->envModel->updateEnv([
+            'DB_HOST' => $host,
+            'DB_NAME' => $dbName,
+            'DB_USER' => $user,
+            'DB_PASS' => $pass
+        ]);
+
+        header("Location: /setup/db_tables");
+        exit;
+    }
+
+    $existing = $this->envModel->readEnv();
+    $dbErrorMessage = $_SESSION['dbErrorMessage'] ?? '';
+    unset($_SESSION['dbErrorMessage']);
+
+    $this->render('database', compact('existing', 'dbErrorMessage'));
+}
+
     
     public function dbTables()
     {

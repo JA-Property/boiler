@@ -1,15 +1,28 @@
 <?php
-
 namespace Core;
 
 use Dotenv\Dotenv;
 use Dotenv\Exception\InvalidPathException;
 use RuntimeException;
+use Setup\Models\EnvModel;
 
 class Config
 {
     private static array $config = [];
     private static string $envPath = '';
+    private static ?EnvModel $envModel = null;
+
+    public static function validateEnvVars(array $keys): array {
+        $missing = [];
+        $env = self::$envModel->readEnv();
+        foreach ($keys as $key) {
+            if (!array_key_exists($key, $env)) {  // Ensures the key exists even if empty.
+                $missing[] = $key;
+            }
+        }
+        return $missing;
+    }
+    
     public static function load(): void
     {
         // Ensure session is started for error handling.
@@ -54,6 +67,11 @@ class Config
             exit;
         }
     
+        // Initialize EnvModel if not already done.
+        if (self::$envModel === null) {
+            self::$envModel = new EnvModel();
+        }
+    
         // Validate required environment variables.
         $missingVars = self::validateEnvVars([
             'DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASS',
@@ -72,27 +90,6 @@ class Config
         self::$config['app']      = require dirname(__DIR__) . '/config/app.php';
     }
     
-    
-    private static function validateEnvVars(array $requiredVars): array
-    {
-        $missing = [];
-    
-        // If ALLOW_EMPTY_DB_PASS=true, then remove DB_PASS from the “must not be empty” list
-        if (isset($_ENV['ALLOW_EMPTY_DB_PASS']) && strtolower($_ENV['ALLOW_EMPTY_DB_PASS']) === 'true') {
-            $requiredVars = array_filter($requiredVars, function($var) {
-                return $var !== 'DB_PASS';
-            });
-        }
-    
-        foreach ($requiredVars as $var) {
-            if (!isset($_ENV[$var]) || trim($_ENV[$var]) === '') {
-                $missing[] = $var;
-            }
-        }
-        return $missing;
-    }
-    
-
     private static function searchEnvFile(string $dir): ?string
     {
         $iterator = new \RecursiveIteratorIterator(
@@ -101,7 +98,7 @@ class Config
         );
     
         foreach ($iterator as $file) {
-            // Skip checking inside the vendor directory
+            // Skip checking inside the vendor directory.
             if (strpos($file->getPath(), 'vendor') !== false) {
                 continue;
             }
@@ -113,7 +110,6 @@ class Config
         return null;
     }
     
-
     public static function get(string $key): mixed
     {
         if (!isset(self::$config[$key])) {
