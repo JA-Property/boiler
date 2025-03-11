@@ -1,0 +1,22 @@
+# Ignore vendor dependencies (installed via Composer)
+vendor/
+
+# Ignore environment files (if you want to keep .env local)
+.env
+.env.local
+.env.*.local
+
+# Ignore Composer lock file if you prefer (optional, usually you want to track this)
+# composer.lock
+
+# Ignore log files and directories
+*.log
+logs/
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# IDE or Editor specific files
+.idea/
+.vscode/

@@ -1,0 +1,18 @@
+# /public/setup/.htaccess
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  
+  # If your project root is something like http://localhost/my-app/public/setup,
+  # set RewriteBase accordingly:
+  # RewriteBase /my-app/public/setup/
+  
+  # If it's just http://localhost/setup, then:
+  RewriteBase /setup/
+  
+  # Skip files & directories that actually exist:
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  
+  # Rewrite everything else to index.php (and pass it via PATH_INFO)
+  RewriteRule ^(.*)$ index.php/$1 [L]
+</IfModule>
